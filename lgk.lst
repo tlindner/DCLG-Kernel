@@ -1,0 +1,191 @@
+                      (          lgk.asm):00001                  org $7000
+7000                  (          lgk.asm):00002         vert  rmb 1
+7001                  (          lgk.asm):00003         horz  rmb 2
+7003                  (          lgk.asm):00004         palette rmb 16
+7013                  (          lgk.asm):00005         border rmb 1
+7014                  (          lgk.asm):00006         start
+7014 12               (          lgk.asm):00007             NOP
+7015 7F7000           (          lgk.asm):00008             clr vert
+7018 7F7001           (          lgk.asm):00009             clr horz
+701B 7F7002           (          lgk.asm):00010             clr horz+1
+701E C610             (          lgk.asm):00011             ldb #16             copy palette registers
+7020 8EFFB0           (          lgk.asm):00012             ldx #$ffb0
+7023 108E7003         (          lgk.asm):00013             ldy #palette
+7027                  (          lgk.asm):00014         pal_loop
+7027 A680             (          lgk.asm):00015             lda ,x+
+7029 843F             (          lgk.asm):00016             anda #$3f
+702B A7A0             (          lgk.asm):00017             sta ,y+
+702D 5A               (          lgk.asm):00018             decb
+702E 26F7             (          lgk.asm):00019             bne pal_loop
+7030 B6FF9A           (          lgk.asm):00020             lda $ff9a
+7033 843F             (          lgk.asm):00021             anda #$3f
+7035 B77013           (          lgk.asm):00022             sta border
+                      (          lgk.asm):00023         
+7038 1A50             (          lgk.asm):00024             ORCC #$50   disable interrupts
+703A 7FFF93           (          lgk.asm):00025             CLR $FF93   clear gime firq interrupts
+703D 8634             (          lgk.asm):00026             LDA #$34
+703F B7FF23           (          lgk.asm):00027             STA $FF23   silence coco speaker
+7042 8EFF00           (          lgk.asm):00028             LDX #$FF00  load pointers to PIA
+7045 108EFF03         (          lgk.asm):00029             LDY #$FF03
+7049 CC3C34           (          lgk.asm):00030             LDD #$3C34
+704C B7FF01           (          lgk.asm):00031             STA $FF01   PIA 0 CA2 goes hi, access output regs
+704F F7FF03           (          lgk.asm):00032             STB $FF03   PIA 0 CB2 goes lo, access output regs, 4 way position: 1 (left vert)
+                      (          lgk.asm):00033         * clock light gun interface box 16 times, looking for state 16
+7052 C610             (          lgk.asm):00034             LDB #$10
+7054                  (          lgk.asm):00035         start_loop
+7054 BD712D           (          lgk.asm):00036             JSR clock   Clock serial hi, then lo
+7057 BD7158           (          lgk.asm):00037             JSR test_comp       test comparator
+705A 2B06             (          lgk.asm):00038             BMI device_syncd
+705C 5A               (          lgk.asm):00039             DECB
+705D 26F5             (          lgk.asm):00040             BNE start_loop      loop until we find proper state
+705F 16009C           (          lgk.asm):00041             lbra clean_up
+                      (          lgk.asm):00042         
+7062                  (          lgk.asm):00043         device_syncd
+7062 C608             (          lgk.asm):00044             LDB #$08    Clock serial 8 times
+7064                  (          lgk.asm):00045         clk_loop
+7064 BD712D           (          lgk.asm):00046             JSR   clock Clock serial hi, then lo
+7067 5A               (          lgk.asm):00047             DECB
+7068 26FA             (          lgk.asm):00048             BNE clk_loop
+                      (          lgk.asm):00049         * we are now in state 7
+706A 8650             (          lgk.asm):00050             LDA #$50    set dac to 20
+706C BD7146           (          lgk.asm):00051             JSR set_dac Write A to DAC
+706F CC343D           (          lgk.asm):00052             LDD #$343D
+7072 B7FF01           (          lgk.asm):00053             STA $FF01   CA2 to lo
+7075 F7FF03           (          lgk.asm):00054             STB $FF03   CB2 to hi (set joystick), interrupt on frame sync
+7078 7DFF00           (          lgk.asm):00055             TST $FF00
+707B 7DFF02           (          lgk.asm):00056             TST $FF02
+707E 13               (          lgk.asm):00057             SYNC                        wait for frame sync
+707F 7DFF02           (          lgk.asm):00058             TST $FF02
+7082 B7FF03           (          lgk.asm):00059             STA $FF03   turn off frame sync interrupt
+7085 F7FF01           (          lgk.asm):00060             STB $FF01   turn on horizontal sync interrupt
+7088 BD7138           (          lgk.asm):00061             JSR clock3  clock serial high
+708B CC3F3F           (          lgk.asm):00062             LDD #$3F3F  white color
+708E B7FF9A           (          lgk.asm):00063             STA $FF9A   coco3 border register
+7091 FDFFB0           (          lgk.asm):00064             STD $FFB0   coco 3 palette registers
+7094 FDFFB2           (          lgk.asm):00065             STD $FFB2
+7097 FDFFB4           (          lgk.asm):00066             STD $FFB4
+709A FDFFB6           (          lgk.asm):00067             STD $FFB6
+709D FDFFB8           (          lgk.asm):00068             STD $FFB8
+70A0 FDFFBA           (          lgk.asm):00069             STD $FFBA
+70A3 FDFFBC           (          lgk.asm):00070             STD $FFBC
+70A6 FDFFBE           (          lgk.asm):00071             STD $FFBE
+70A9 C6CE             (          lgk.asm):00072             LDB #$CE    preload line counter to -50
+70AB                  (          lgk.asm):00073         line_loop
+70AB 13               (          lgk.asm):00074             SYNC                        wait for horizontal sync
+70AC 6D84             (          lgk.asm):00075             TST ,X              (x == FF00)
+70AE 2B09             (          lgk.asm):00076             BMI found_signal    branch if comparator set
+70B0 5C               (          lgk.asm):00077             INCB                        increment b for each scan line
+70B1 6DA4             (          lgk.asm):00078             TST ,Y              (y == FF03)
+70B3 2AF6             (          lgk.asm):00079             BPL line_loop       branch if not end of frame
+70B5 12               (          lgk.asm):00080             NOP
+70B6                  (          lgk.asm):00081         done
+70B6 7E70FE           (          lgk.asm):00082             JMP clean_up
+                      (          lgk.asm):00083         
+70B9                  (          lgk.asm):00084         found_signal
+70B9 F77000           (          lgk.asm):00085             STB   vert
+70BC BD7136           (          lgk.asm):00086             JSR   clock2        clock serial hi to low
+70BF 8635             (          lgk.asm):00087             LDA   #$35
+70C1 B7FF01           (          lgk.asm):00088             STA   $FF01 pia 0, cb2 is low
+70C4 13               (          lgk.asm):00089             SYNC
+70C5 13               (          lgk.asm):00090             SYNC
+70C6 13               (          lgk.asm):00091             SYNC
+70C7 8650             (          lgk.asm):00092             LDA   #$50  dac value: 20
+70C9 BD7146           (          lgk.asm):00093             JSR   set_dac       Write A to DAC
+70CC 8614             (          lgk.asm):00094             LDA   #$14
+70CE 5F               (          lgk.asm):00095             CLRB
+70CF BD716B           (          lgk.asm):00096             JSR   pause delay loop (uses X)
+70D2 78FF00           (          lgk.asm):00097             ASL   $FF00
+70D5 59               (          lgk.asm):00098             ROLB
+70D6 F77001           (          lgk.asm):00099             STB   horz
+70D9 2702             (          lgk.asm):00100             BEQ   skip
+70DB 86B4             (          lgk.asm):00101             LDA   #$B4  dac value 45
+70DD                  (          lgk.asm):00102         skip
+70DD 8D67             (          lgk.asm):00103             BSR   set_dac       Write A to DAC
+70DF BD716B           (          lgk.asm):00104             JSR   pause delay loop (uses X)
+70E2 78FF00           (          lgk.asm):00105             ASL   $FF00
+70E5 767002           (          lgk.asm):00106             ROR   horz+1
+70E8 8D45             (          lgk.asm):00107             BSR   clock_alt     clock serial lo
+70EA 8614             (          lgk.asm):00108             LDA   #$14  dac value 5
+70EC 8D58             (          lgk.asm):00109             BSR   set_dac       Write A to DAC
+70EE C607             (          lgk.asm):00110             LDB   #$07
+70F0                  (          lgk.asm):00111         read_loop
+70F0 BD716B           (          lgk.asm):00112             JSR   pause delay loop (uses X)
+70F3 78FF00           (          lgk.asm):00113             ASL   $FF00
+70F6 767002           (          lgk.asm):00114             ROR   horz+1
+70F9 8D32             (          lgk.asm):00115             BSR   clock Clock serial hi, then lo
+70FB 5A               (          lgk.asm):00116             DECB
+70FC 26F2             (          lgk.asm):00117             BNE read_loop       loop back (read 7 times)
+                      (          lgk.asm):00118         
+70FE                  (          lgk.asm):00119         clean_up
+70FE 8602             (          lgk.asm):00120             LDA   #$02  set serial high
+7100 B7FF20           (          lgk.asm):00121             STA   $FF20
+7103 863C             (          lgk.asm):00122             LDA   #$3C  turn sound back on
+7105 B7FF23           (          lgk.asm):00123             STA   $FF23
+                      (          lgk.asm):00124         
+7108 C610             (          lgk.asm):00125             ldb #16             copy palette registers
+710A 8EFFB0           (          lgk.asm):00126             ldx #$ffb0
+710D 108E7003         (          lgk.asm):00127             ldy #palette
+7111                  (          lgk.asm):00128         clean_loop
+7111 A6A0             (          lgk.asm):00129             lda ,y+
+7113 A780             (          lgk.asm):00130             sta ,x+
+7115 5A               (          lgk.asm):00131             decb
+7116 26F9             (          lgk.asm):00132             bne clean_loop
+7118 B67013           (          lgk.asm):00133             lda border
+711B B7FF9A           (          lgk.asm):00134             sta $ff9a
+711E 7FFF93           (          lgk.asm):00135             CLR $FF93   clear gime firq interrupts
+7121 CC3C34           (          lgk.asm):00136             LDD #$3C34
+7124 B7FF01           (          lgk.asm):00137             STA $FF01   PIA 0 CA2 goes hi, access output regs
+7127 F7FF03           (          lgk.asm):00138             STB $FF03   PIA 0 CB2 goes lo, access output regs, 4 way position: 1 (left vert)
+712A 1CAF             (          lgk.asm):00139             andcc #$af
+712C 39               (          lgk.asm):00140             rts
+                      (          lgk.asm):00141         
+712D                  (          lgk.asm):00142         clock
+712D 8D09             (          lgk.asm):00143             BSR clock3
+712F                  (          lgk.asm):00144         clock_alt
+712F B6FF20           (          lgk.asm):00145             LDA   $FF20 get rs232 / dac
+7132 84FD             (          lgk.asm):00146             ANDA  #$FD  clear tx
+7134 2007             (          lgk.asm):00147             BRA clck_continue
+7136                  (          lgk.asm):00148         clock2
+7136 8DF7             (          lgk.asm):00149             BSR   clock_alt
+7138                  (          lgk.asm):00150         clock3
+7138 B6FF20           (          lgk.asm):00151             LDA   $FF20
+713B 8A02             (          lgk.asm):00152             ORA   #$02  set rs232 tx high
+713D                  (          lgk.asm):00153         clck_continue
+713D B7FF20           (          lgk.asm):00154             STA   $FF20 send to rs232
+7140 860A             (          lgk.asm):00155             LDA   #$0A
+7142                  (          lgk.asm):00156         clck_loop
+7142 4A               (          lgk.asm):00157             DECA
+7143 26FD             (          lgk.asm):00158             BNE   clck_loop
+7145 39               (          lgk.asm):00159             RTS
+                      (          lgk.asm):00160         
+7146                  (          lgk.asm):00161         set_dac
+7146 3402             (          lgk.asm):00162             PSHS  A             save dac value for later
+7148 B6FF20           (          lgk.asm):00163             LDA   $FF20 get pia value
+714B 8403             (          lgk.asm):00164             ANDA  #$03  keep serial and cassette
+714D AAE0             (          lgk.asm):00165             ORA   ,S+           or in bits provided, adjust stack pointer
+714F B7FF20           (          lgk.asm):00166             STA   $FF20
+7152 8632             (          lgk.asm):00167             LDA   #$32  wait for comparator to settle
+7154                  (          lgk.asm):00168         sd_loop
+7154 4A               (          lgk.asm):00169             DECA
+7155 26FD             (          lgk.asm):00170             BNE   sd_loop
+7157 39               (          lgk.asm):00171             RTS
+                      (          lgk.asm):00172         
+7158                  (          lgk.asm):00173         test_comp
+7158 8650             (          lgk.asm):00174             LDA #$50    new dac value (20)
+715A 8DEA             (          lgk.asm):00175             BSR set_dac write A to dac
+715C 8614             (          lgk.asm):00176             LDA #$14    new dac value (5)
+715E 7DFF00           (          lgk.asm):00177             TST $FF00   test negative flag on comparator output
+7161 2A02             (          lgk.asm):00178             BPL tc_1
+7163 8684             (          lgk.asm):00179             LDA #$84    new dac value (33)
+7165                  (          lgk.asm):00180         tc_1
+7165 8DDF             (          lgk.asm):00181             BSR set_dac write a to dac
+7167 B6FF00           (          lgk.asm):00182             LDA $FF00
+716A 39               (          lgk.asm):00183             RTS
+                      (          lgk.asm):00184         
+716B                  (          lgk.asm):00185         pause
+716B 8E00C8           (          lgk.asm):00186             LDX #$00C8
+716E                  (          lgk.asm):00187         ps_loop
+716E 301F             (          lgk.asm):00188             LEAX -$1,X
+7170 26FC             (          lgk.asm):00189             BNE ps_loop
+7172 39               (          lgk.asm):00190             RTS
+                      (          lgk.asm):00191             end start
