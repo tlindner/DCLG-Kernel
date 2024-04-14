@@ -7,7 +7,7 @@ Start the BASIC program. Point the gun at the CoCo's screen and press the triger
 The coordinates the gun is pointing at will be displayed.
 
 ## More Information
-Here is my reverse engineering of the device, and it theroy of operation:
+Here is my reverse engineering of the device, and it theory of operation:
 http://tlindner.macmess.org/?page_id=105
 
 ## Credit
